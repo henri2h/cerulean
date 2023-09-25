@@ -147,7 +147,7 @@ class UserPage extends React.Component {
                             .filter((ev) => {
                                 // only messages sent by this user
                                 if (
-                                    ev.type !== "m.room.message" ||
+                                    !(ev.type === "org.matrix.msc3639.social.post" || ev.type === "org.matrix.msc3639.social.comment") ||
                                     ev.sender !== this.props.userId
                                 ) {
                                     return false;

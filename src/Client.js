@@ -182,8 +182,7 @@ class Client {
         const data = await this.fetchJson(
             `${this.serverUrl}/r0/rooms/${encodeURIComponent(
                 roomId
-            )}/state/${encodeURIComponent(stateType)}/${
-                (stateKey && encodeURIComponent(stateKey)) || ""
+            )}/state/${encodeURIComponent(stateType)}/${(stateKey && encodeURIComponent(stateKey)) || ""
             }`,
             {
                 method: "GET",
@@ -198,7 +197,21 @@ class Client {
         const data = await this.fetchJson(
             `${this.serverUrl}/r0/rooms/${encodeURIComponent(
                 roomId
-            )}/send/m.room.message/${encodeURIComponent(txnId)}`,
+            )}/send/org.matrix.msc3639.social.post/${encodeURIComponent(txnId)}`,
+            {
+                method: "PUT",
+                body: JSON.stringify(content),
+                headers: { Authorization: `Bearer ${this.accessToken}` },
+            }
+        );
+        return data.event_id;
+    }
+    async sendReplyMessage(roomId, content) {
+        const txnId = Date.now();
+        const data = await this.fetchJson(
+            `${this.serverUrl}/r0/rooms/${encodeURIComponent(
+                roomId
+            )}/send/org.matrix.msc3639.social.comment/${encodeURIComponent(txnId)}`,
             {
                 method: "PUT",
                 body: JSON.stringify(content),
@@ -299,19 +312,20 @@ class Client {
         const roomIds = Object.keys(syncData.rooms.join).filter((roomId) => {
             // try to find an #@ alias
             let foundAlias = false;
-            for (let ev of syncData.rooms.join[roomId].state.events) {
-                if (ev.type === "m.room.aliases" && ev.content.aliases) {
-                    for (let alias of ev.content.aliases) {
-                        if (alias.startsWith("#@")) {
-                            foundAlias = true;
-                            break;
+            if (syncData.rooms.join[roomId].state !== undefined)
+                for (let ev of syncData.rooms.join[roomId].state.events) {
+                    if (ev.type === "m.room.aliases" && ev.content.aliases) {
+                        for (let alias of ev.content.aliases) {
+                            if (alias.startsWith("#@")) {
+                                foundAlias = true;
+                                break;
+                            }
                         }
                     }
+                    if (foundAlias) {
+                        break;
+                    }
                 }
-                if (foundAlias) {
-                    break;
-                }
-            }
             return foundAlias;
         });
         let events = [];
@@ -357,7 +371,7 @@ class Client {
             from = data.end;
             let msgs = [];
             data.chunk.forEach((ev) => {
-                if (ev.type !== "m.room.message") {
+                if (ev.type !== "org.matrix.msc3639.social.post" && ev.type !== "org.matrix.msc3639.social.comment") {
                     return;
                 }
                 ev.room_id = roomId;
@@ -481,6 +495,9 @@ class Client {
                 preset: "public_chat",
                 name: `${this.userId}'s thread`,
                 topic: "Cerulean",
+                creation_content: {
+                    type: "org.matrix.msc3639.social.profile",
+                }
             }),
             headers: {
                 Authorization: `Bearer ${this.accessToken}`,
@@ -542,7 +559,7 @@ class Client {
 
         // we're uploading an image and some text
         if (dataUri) {
-            const eventId = await this.sendMessage(roomIdReplyingIn, {
+            const eventId = await this.sendReplyMessage(roomIdReplyingIn, {
                 body: text,
                 msgtype: "m.image",
                 url: dataUri,
@@ -565,7 +582,7 @@ class Client {
         }
 
         // text only upload
-        const eventId = await this.sendMessage(roomIdReplyingIn, {
+        const eventId = await this.sendReplyMessage(roomIdReplyingIn, {
             body: text,
             msgtype: "m.text",
             "m.relationship": {
@@ -680,7 +697,7 @@ class Client {
 
     async uploadFile(file) {
         const fileName = file.name;
-        const mediaUrl = this.serverUrl.slice(0, -1 * "/client".length);
+        const mediaUrl = "http://192.168.12.71:8008"; // this.serverUrl.slice(0, -1 * "/client".length);
         const res = await fetch(
             `${mediaUrl}/media/r0/upload?filename=${encodeURIComponent(
                 fileName
@@ -719,11 +736,10 @@ class Client {
             return;
         }
         const mediaUrl = this.serverUrl.slice(0, -1 * "/client".length);
-        return `${mediaUrl}/media/r0/thumbnail/${
-            mxcUri.split("mxc://")[1]
-        }?method=${encodeURIComponent(method)}&width=${encodeURIComponent(
-            width
-        )}&height=${encodeURIComponent(height)}`;
+        return `${mediaUrl}/media/r0/thumbnail/${mxcUri.split("mxc://")[1]
+            }?method=${encodeURIComponent(method)}&width=${encodeURIComponent(
+                width
+            )}&height=${encodeURIComponent(height)}`;
     }
 
     async fetchJson(fullUrl, fetchParams) {

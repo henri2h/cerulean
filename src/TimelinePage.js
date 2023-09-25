@@ -100,7 +100,7 @@ class TimelinePage extends React.Component {
                         {this.state.timeline
                             .filter((ev) => {
                                 // only messages
-                                if (ev.type !== "m.room.message") {
+                                if (ev.type !== "org.matrix.msc3639.social.post") {
                                     return false;
                                 }
                                 // only messages with cerulean fields
